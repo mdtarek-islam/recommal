@@ -1,0 +1,4 @@
+# Keep LF endings so that bash runs the hooks and skill hashes stay stable on Windows.
+*.sh text eol=lf
+.claude/skills/** text eol=lf
+skills-lock.json text eol=lf

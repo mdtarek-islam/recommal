@@ -1,0 +1,8 @@
+# Streamlit configuration for Recommal. Keep secrets in .streamlit/secrets.toml, not here.
+
+[server]
+enableCORS = true
+enableXsrfProtection = true
+
+[client]
+showErrorDetails = false
