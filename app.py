@@ -1,207 +1,283 @@
+"""Recommal Streamlit entry point: cross-domain anime and game recommendations.
+
+Run: streamlit run app.py
+"""
+
+from __future__ import annotations
+
+import copy
+import logging
+import time
+from typing import Any
+
+import psycopg2
 import streamlit as st
-from auth_utils import register_user, login_user, get_results_data # Updated import
 
-# --- Page Configuration (must be the first st command) ---
-# Set layout to "wide" to match your template
-st.set_page_config(page_title="RecommaI", layout="wide")
+from auth_utils import DB_ERROR, LOGIN_ERROR, login_user, register_user
+from src.ab_testing.cohort import assign_variant, hash_user
+from src.ab_testing.events import log_event
+from src.config import DOMAINS
+from src.db.pool import DatabaseUnavailable
+from src.ui import components, data, routing, throttle
 
-# --- Initialize Session State ---
-# This holds the user's login status and search state.
-if 'logged_in' not in st.session_state:
-    st.session_state['logged_in'] = False
-if 'user_email' not in st.session_state:
-    st.session_state['user_email'] = ""
-if 'search_query' not in st.session_state:
-    st.session_state['search_query'] = None
-if 'search_domain' not in st.session_state:
-    st.session_state['search_domain'] = None
+logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
+for _noisy in ("psycopg2", "urllib3"):
+    logging.getLogger(_noisy).setLevel(logging.WARNING)
+log = logging.getLogger("recommal.app")
 
-# ===============================================
-# ===         LOGIN PAGE VIEW                 ===
-# ===============================================
+st.set_page_config(page_title="Recommal", page_icon="logo.png", layout="wide")
+components.apply_styles()
 
-def show_login_page():
-    """Displays the login and registration forms."""
-    
-    col1, col2, col3 = st.columns([1, 1.5, 1]) 
+MAX_RECENT = 5
+MAX_QUERY_CHARS = 100  # Longer search text adds no precision to a title match.
 
-    with col2:
-        with st.container(border=True):
-            try:
-                st.image("logo.png") 
-            except:
-                st.error("Logo image not found. Make sure 'logo.png' is in the same folder.")
-                
-            st.title("Sign in to Unlock Your World")
+# ---- Session state: initialise every key here and nowhere else.
+DEFAULT_STATE: dict[str, Any] = {
+    "logged_in": False,
+    "user_email": "",  # Held in server memory for cohort assignment only. Never logged.
+    "last_domain": "anime",  # Domain of the last search. Survives the results view.
+    "last_query": "",  # Search text of the last search. Survives the results view.
+    "domain_picker": "anime",  # Widget key. Synced from last_domain before each render.
+    "query_input": "",  # Widget key. Synced from last_query before each render.
+    "recent": [],  # Recently opened titles for this session: (domain, id, title), newest first.
+    "login_throttle": throttle.new_state(),  # Failure counters. No passwords, no emails.
+    "logged_exposures": set(),
+    "logged_feedback": set(),
+    "scroll_to_top": False,  # Set when a title opens; the next run scrolls the page to the top once.
+}
+for _key, _value in DEFAULT_STATE.items():
+    if _key not in st.session_state:
+        st.session_state[_key] = copy.deepcopy(_value)
 
-            tab1, tab2 = st.tabs(["Log In", "Sign Up"])
+DB_FAILURES = (DatabaseUnavailable, psycopg2.Error)
 
-            # --- LOGIN FORM ---
-            with tab1:
-                with st.form(key='login_form'):
-                    email = st.text_input("Email Address", key="login_email")
-                    password = st.text_input("Password", type="password", key="login_pass")
-                    login_button = st.form_submit_button(label="Log In", use_container_width=True)
-                    
-                    if login_button:
-                        success, message = login_user(email, password)
-                        if success:
-                            st.session_state['logged_in'] = True
-                            st.session_state['user_email'] = email
-                            st.rerun() 
-                        else:
-                            st.error(message)
 
-            # --- REGISTRATION FORM ---
-            with tab2:
-                with st.form(key='signup_form'):
-                    reg_email = st.text_input("Email Address", key="reg_email")
-                    reg_password = st.text_input("Create Password", type="password", key="reg_pass")
-                    reg_confirm_pass = st.text_input("Confirm Password", type="password", key="reg_confirm")
-                    signup_button = st.form_submit_button(label="Create Account", use_container_width=True)
+def log_failure(context: str, exc: BaseException) -> None:
+    """Log the exception type only. Driver messages can hold host names and user names."""
+    log.error("%s failed: %s", context, type(exc).__name__)
 
-                    if signup_button:
-                        if reg_password == reg_confirm_pass:
-                            success, message = register_user(reg_email, reg_password)
-                            if success:
-                                st.success(message)
-                            else:
-                                st.error(message)
-                        else:
-                            st.error("Passwords do not match.")
 
-# ===============================================
-# ===         SEARCH VIEW                     ===
-# ===============================================
+# ---- Callbacks. Each one changes state; Streamlit then reruns the script.
+def on_domain_change() -> None:
+    domain = st.session_state["domain_picker"]
+    if domain in DOMAINS:
+        st.session_state["last_domain"] = domain
+        routing.write_search(st.query_params, domain)
 
-def show_search_view():
-    """Displays the main search bar and domain selection."""
-    st.title("Find Your Next Obsession")
-    st.subheader("Select a domain and enter a title to get started!")
 
-    # Use a form to group the inputs and search button
-    with st.form(key="search_form"):
-        col1, col2 = st.columns([1, 3])
-        with col1:
-            # 1. DOMAIN DROPDOWN
-            domain = st.selectbox(
-                "I have an...",
-                ("Game", "Anime"),
-                index=0 # Default to "Game"
-            )
-        with col2:
-            # 2. SEARCH BAR
-            query = st.text_input(
-                "Enter title",
-                placeholder="e.g., Elden Ring, One Piece, or Studio Ghibli"
-            )
-        
-        # 3. SUBMIT BUTTON
-        submit_button = st.form_submit_button(label="Find Recommendations")
+def on_query_change() -> None:
+    st.session_state["last_query"] = str(st.session_state["query_input"] or "")
 
-    if submit_button and query:
-        # When user searches, save state and rerun to show results view
-        st.session_state['search_query'] = query
-        st.session_state['search_domain'] = domain.lower() # "game" or "anime"
+
+def open_title(domain: str, item_id: int, via: str, query: str | None = None, **metadata: Any) -> None:
+    """Open the results view for one title and log the search event."""
+    st.session_state["last_domain"] = domain
+    st.session_state["scroll_to_top"] = True
+    routing.write_results(st.query_params, domain, item_id)
+    log_event(st.session_state["user_email"], "search", query=query, source_domain=domain, source_id=item_id,
+              metadata={"via": via, **metadata})  # fmt: skip
+
+
+def back_to_search(domain: str) -> None:
+    routing.write_search(st.query_params, domain)
+
+
+def log_out() -> None:
+    for key, value in DEFAULT_STATE.items():
+        if key != "login_throttle":
+            st.session_state[key] = copy.deepcopy(value)
+    st.query_params.clear()
+
+
+def remember_recent(domain: str, item_id: int, title: str) -> None:
+    recent = [r for r in st.session_state["recent"] if (r[0], r[1]) != (domain, item_id)]
+    st.session_state["recent"] = [(domain, item_id, title), *recent][:MAX_RECENT]
+
+
+# ---- Views
+def show_login_page() -> None:
+    with st.container(key="login-card", border=True):
+        st.image("logo.png", width=56, alt="Recommal logo")
+        st.title("Recommal")
+        st.write("Get game recommendations from an anime you like, or anime recommendations from a game.")
+        login_tab, signup_tab = st.tabs(["Log in", "Create account"])
+        with login_tab, st.form("login_form"):
+            email = st.text_input("Email address", key="login_email", autocomplete="username")
+            password = st.text_input("Password", type="password", key="login_pass", autocomplete="current-password")
+            if st.form_submit_button("Log in", type="primary", width="stretch"):
+                handle_login(email, password)
+        with signup_tab, st.form("signup_form"):
+            email = st.text_input("Email address", key="reg_email", autocomplete="email")
+            password = st.text_input("Password (at least 8 characters)", type="password", key="reg_pass",
+                                     autocomplete="new-password")  # fmt: skip
+            confirm = st.text_input("Repeat the password", type="password", key="reg_confirm",
+                                    autocomplete="new-password")  # fmt: skip
+            if st.form_submit_button("Create account", type="primary", width="stretch"):
+                if password != confirm:
+                    st.error("The passwords do not match.")
+                else:
+                    ok, message = register_user(email, password)
+                    (st.success if ok else st.error)(message)
+
+
+def handle_login(email: str, password: str) -> None:
+    state = st.session_state["login_throttle"]
+    email_key = hash_user(email) if email.strip() else ""
+    wait = throttle.seconds_left(state, email_key, time.time())
+    if wait:
+        st.error(f"Too many failed attempts. Wait {wait} seconds, then try again.")
+        return
+    ok, message = login_user(email, password)
+    if ok:
+        throttle.record_success(state, email_key)
+        st.session_state.update(logged_in=True, user_email=email.strip().lower())
         st.rerun()
-    elif submit_button and not query:
-        st.error("Please enter a title to search.")
+    if message == LOGIN_ERROR:
+        throttle.record_failure(state, email_key, time.time())
+        wait = throttle.seconds_left(state, email_key, time.time())
+        if wait:
+            message = f"{LOGIN_ERROR} Too many failed attempts. Wait {wait} seconds, then try again."
+    st.error(message)
 
-# ===============================================
-# ===         RESULTS VIEW                    ===
-# ===============================================
 
-def show_results_view():
-    """
-    Displays the results page based on the template,
-    using data from session state.
-    """
-    query = st.session_state['search_query']
-    domain = st.session_state['search_domain']
-    
-    # --- "New Search" Button ---
-    if st.button("← Start a New Search"):
-        # Clear the search state and rerun to go back to search view
-        st.session_state['search_query'] = None
-        st.session_state['search_domain'] = None
-        st.rerun()
+def show_top_bar() -> None:
+    with st.container(key="top-bar", horizontal=True, horizontal_alignment="distribute", vertical_alignment="center"):
+        st.html("<p class='rc-title'>Recommal</p>")
+        st.button("Log out", key="logout", on_click=log_out)
 
-    # --- Fetch Data ---
-    # This queries the DB and gets all image URLs and synopses
-    data = get_results_data(query, domain)
-    
-    if not data:
-        st.error(f"Could not find any recommendations for '{query}'. Please try another title.")
-        return # Stop execution if no data
 
-    # --- 1. Display Input Item (Top 60%) ---
-    input_item = data['input_item']
-    st.header(f"Based on your input: {input_item['title']}")
-    
-    col1, col2 = st.columns([1, 2]) # Ratio as per your template
-    
-    with col1:
-        st.image(input_item['image_url'], use_container_width=True)
-    
-    with col2:
-        # Create the grey info box from the template
-        with st.container(border=True):
-            # We don't have Genre/Start Date in the DB, so we'll just show synopsis.
-            
-            # Synopsis Preview
-            synopsis_preview = " ".join(input_item['synopsis'].split()[:40]) + "..."
-            st.write(f"**Synopsis:** {synopsis_preview}")
-            
-            # Full Synopsis in an Expander (the "hover" effect)
-            with st.expander("Read full synopsis"):
-                st.write(input_item['synopsis'])
+def show_recent() -> None:
+    recent = st.session_state["recent"]
+    if not recent:
+        return
+    st.html("<p class='rc-muted'>Recent titles in this session</p>")
+    with st.container(key="recent-list", horizontal=True):
+        for domain, item_id, title in recent:
+            label = f"{components.md_escape(title)} ({components.domain_label(domain)})"
+            st.button(label, key=f"recent-{domain}-{item_id}", on_click=open_title, args=(domain, item_id, "recent"))
 
+
+def show_search_view() -> None:
+    st.header("Find recommendations")
+    st.write("Choose a starting title. You get titles from the other type: games for an anime, anime for a game.")
+    st.session_state["domain_picker"] = st.session_state["last_domain"]
+    st.segmented_control("Type of starting title", options=list(DOMAINS), format_func=components.domain_label,
+                         key="domain_picker", required=True, on_change=on_domain_change)  # fmt: skip
+    domain: str = st.session_state["last_domain"]
+    label = components.domain_label(domain).lower()
+    st.session_state["query_input"] = st.session_state["last_query"]
+    st.text_input(f"{components.domain_label(domain)} title", key="query_input", type="search",
+                  placeholder=components.SEARCH_EXAMPLE[domain], autocomplete="off",
+                  on_change=on_query_change)  # fmt: skip
+    query = st.session_state["last_query"].strip()[:MAX_QUERY_CHARS]
+    if len(query) < 2:
+        if query:
+            st.caption("Type at least 2 characters, then press Enter.")
+        else:
+            # The style sheet shows one hint: "hint-empty" for an empty field, "hint-typed" once it holds text.
+            with st.container(key="hint-empty"):
+                st.caption("Type a title, then press Enter to search.")
+            with st.container(key="hint-typed"):
+                st.caption("Press Enter to search.")
+        show_recent()
+        return
+    try:
+        with st.spinner(f"Searching {label} titles..."):
+            matches = data.search_titles(domain, query)
+    except DB_FAILURES as exc:
+        log_failure("Title search", exc)
+        st.error(DB_ERROR)
+        return
+    if not matches:
+        st.info(f'No {label} title matches "{components.md_escape(query)}". Check the spelling or try another name.')
+        show_recent()
+        return
+    count = "1 match" if len(matches) == 1 else f"{len(matches)} matches"
+    st.caption(f"{count}. Select a title to see its recommendations.")
+    with st.container(key="match-list"):
+        for match in matches:
+            st.button(components.match_label(match), key=f"pick-{domain}-{match['id']}", width="stretch",
+                      on_click=open_title, args=(domain, int(match["id"]), "search", query))  # fmt: skip
+    show_recent()
+
+
+def show_results_view(domain: str, item_id: int) -> None:
+    user = st.session_state["user_email"]
+    variant = assign_variant(user)
+    st.button("Back to search", key="back", on_click=back_to_search, args=(domain,))
+    try:
+        with st.spinner("Loading recommendations..."):
+            result = data.results(domain, item_id, variant)
+    except DB_FAILURES as exc:
+        log_failure("Results lookup", exc)
+        st.error(DB_ERROR)
+        return
+    if not result:
+        st.warning("This title is not in the catalogue. Go back and search again.")
+        return
+    item, recs, rec_domain = result["input_item"], result["recommendations"], result["rec_domain"]
+    components.show_breadcrumb(domain, str(item["title"]))
+    remember_recent(domain, item_id, str(item["title"]))
+    components.show_input_item(item, domain)
     st.divider()
+    st.subheader(f"{components.DOMAIN_PLURAL[rec_domain]} similar to {components.md_escape(item['title'])}")
+    if not recs:
+        st.info("No recommendations exist for this title yet. Go back and choose another title.")
+        return
 
-    # --- 2. Display Recommendations (Bottom 40%) ---
-    st.header(f"Recommended {data['rec_domain'].capitalize()}s")
+    exposure_key = (domain, item_id, variant)
+    if exposure_key not in st.session_state["logged_exposures"]:
+        st.session_state["logged_exposures"].add(exposure_key)
+        log_event(user, "exposure", query=st.session_state["last_query"] or None, source_domain=domain,
+                  source_id=item_id, rec_ids=[int(r["id"]) for r in recs],
+                  metadata={"model_ranks": [int(r["rank"]) for r in recs]})  # fmt: skip
 
-    # Use 5 columns for the horizontal list, as per the template
-    cols = st.columns(5)
-    
-    for i, rec in enumerate(data['recommendations']):
-        with cols[i]:
-            # This container creates the "card" for each recommendation
-            with st.container(border=True):
-                st.image(rec['image_url'], use_container_width=True)
-                st.markdown(f"**{rec['title']}**")
-                
-                # Synopsis preview
-                rec_synopsis_preview = " ".join(rec['synopsis'].split()[:15]) + "..."
-                st.write(rec_synopsis_preview)
-                
-                # Full details in an expander
-                # This is the Streamlit-native way to do your "hover to expand" request
-                with st.expander("See details"):
-                    st.write(rec['synopsis'])
+    def on_feedback(target_id: int, widget_key: str) -> None:
+        # on_change fires only when the user changes the widget, not on every rerun.
+        choice = st.session_state.get(widget_key)
+        if choice is None:
+            return
+        relevance = 1 if choice == 1 else -1
+        dedupe_key = (domain, item_id, target_id, relevance)
+        if dedupe_key in st.session_state["logged_feedback"]:
+            return
+        st.session_state["logged_feedback"].add(dedupe_key)
+        log_event(user, "feedback", source_domain=domain, source_id=item_id, target_id=target_id,
+                  relevance=relevance)  # fmt: skip
+        st.toast("Feedback saved.")
 
-# ===============================================
-# ===         MAIN APP ROUTER                 ===
-# ===============================================
+    def on_open(target_domain: str, target_id: int) -> None:
+        open_title(target_domain, target_id, "recommendation", from_domain=domain, from_id=item_id)
 
-# --- Top-level Logout Button (appears on all pages when logged in) ---
-if st.session_state['logged_in']:
-    # Place logout button in the top-right corner
-    cols = st.columns([10, 1])
-    with cols[1]:
-        if st.button("Log Out"):
-            st.session_state['logged_in'] = False
-            st.session_state['user_email'] = ""
-            st.session_state['search_query'] = None
-            st.session_state['search_domain'] = None
-            st.rerun()
+    explained = variant == "explained"
+    source_themes = item.get("themes") or []
+    with st.container(key="rec-grid", horizontal=True, gap="small"):
+        for position, rec in enumerate(recs, start=1):
+            components.show_recommendation_card(rec, rec_domain, source_themes, explained,
+                                                feedback_key=f"fb-{domain}-{item_id}-{rec['id']}",
+                                                on_feedback=on_feedback, on_open=on_open,
+                                                position=position)  # fmt: skip
 
-# --- Main Logic: Show Login or App ---
-if not st.session_state['logged_in']:
+
+# ---- Router. The URL decides the view; session state keeps the user and the search text.
+route = routing.read(st.query_params)
+if route.domain is not None:
+    st.session_state["last_domain"] = route.domain
+
+if not st.session_state["logged_in"]:
     show_login_page()
 else:
-    # User is logged in, decide which view to show
-    if st.session_state['search_query'] is None:
-        show_search_view() # Show search bar
+    show_top_bar()
+    if route.invalid:
+        st.warning("This link is not valid. Search for a title instead.")
+    if route.item_id is None or route.domain is None:
+        show_search_view()
     else:
-        show_results_view() # Show results page
+        show_results_view(route.domain, route.item_id)
+
+st.divider()
+components.show_about()
+
+if st.session_state["scroll_to_top"]:
+    st.session_state["scroll_to_top"] = False
+    components.scroll_to_top(key=f"scroll-top-{time.time_ns()}")
