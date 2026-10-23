@@ -132,33 +132,53 @@ class SplitConfig:
 
 @dataclass(frozen=True)
 class SiameseConfig:
-    """Siamese network and training hyperparameters."""
+    """Siamese network and training hyperparameters.
+
+    The defaults are the siamese-v3 configuration, selected on mean validation MAP@10 over
+    three seeds (artefacts/tuning_log.md). `V2_FIELD_DEFAULTS` rebuilds older checkpoints.
+    pos_per_item, neg_per_item and the hard-negative settings define the fixed pair-mining
+    protocol for the reported validation and test contrastive loss.
+    """
 
     hidden_dim: int = 512
     proj_dim: int = 128
-    dropout: float = 0.1
+    dropout: float = 0.7
     margin: float = 0.5
     lr: float = 1e-3
-    weight_decay: float = 1e-4
+    weight_decay: float = 1e-2
     batch_size: int = 512
-    max_epochs: int = 30
+    max_epochs: int = 50
     patience: int = 5
     pos_per_item: int = 4
     neg_per_item: int = 4
     hard_negative_fraction: float = 0.5
     hard_negative_pool: int = 50
     resample_pairs: bool = False  # Mine fresh training pairs each epoch.
-    # siamese-v3 settings. The defaults reproduce siamese-v2 (mined pairs, SBERT input only).
-    objective: str = "pairs"  # "pairs": mined pairs; "inbatch": all anime-game pairs of a sampled batch.
-    input_features: str = "sbert"  # "sbert" or "sbert+tfidf".
+    objective: str = "inbatch"  # "pairs": mined pairs (v2); "inbatch": all anime-game pairs of a sampled batch.
+    input_features: str = "sbert+tfidf"  # "sbert" or "sbert+tfidf".
     tfidf_dim: int = 256  # SVD components of the TF-IDF input block.
     contrastive_weight: float = 1.0  # Balanced contrastive loss over in-batch pairs (J >= threshold vs J == 0).
-    infonce_weight: float = 0.0  # Cross-domain InfoNCE with relevance-weighted targets.
-    theme_weight: float = 0.0  # Auxiliary multi-label theme head (BCE).
-    temperature: float = 0.05  # InfoNCE temperature.
+    infonce_weight: float = 1.0  # Cross-domain InfoNCE with relevance-weighted targets.
+    theme_weight: float = 1.0  # Auxiliary multi-label theme head (BCE).
+    temperature: float = 0.1  # InfoNCE temperature.
     graded_gamma: float = 0.0  # 0: binary InfoNCE targets; > 0: target weight Jaccard ** gamma.
     steps_per_epoch: int = 160  # In-batch steps per epoch; batch_size items of each domain per step.
-    ensemble_size: int = 1  # Encoders trained with consecutive seeds; their cosines are averaged.
+    ensemble_size: int = 5  # Encoders trained with consecutive seeds; their cosines are averaged.
+
+
+# Values of fields that siamese-v2 checkpoints do not store. They rebuild those models unchanged.
+V2_FIELD_DEFAULTS: dict[str, object] = {
+    "objective": "pairs",
+    "input_features": "sbert",
+    "tfidf_dim": 256,
+    "contrastive_weight": 1.0,
+    "infonce_weight": 0.0,
+    "theme_weight": 0.0,
+    "temperature": 0.05,
+    "graded_gamma": 0.0,
+    "steps_per_epoch": 160,
+    "ensemble_size": 1,
+}
 
 
 @dataclass(frozen=True)
@@ -168,7 +188,9 @@ class EvalConfig:
     popularity_weight: float = 0.05  # Variant B re-ranking weight.
     max_queries: int = 2000
     random_seeds: int = 5  # Seeds averaged for the random baseline ablation.
-    extra_train_seeds: tuple[int, ...] = (43, 44)  # Seeds for the seed-variance ablation (checkpoints seed<N>).
+    # Base seeds of extra ensembles for the seed-variance ablation (checkpoints seed<N>). With 5 members,
+    # 42, 47 and 52 give disjoint member seeds 42-46, 47-51 and 52-56.
+    extra_train_seeds: tuple[int, ...] = (47, 52)
     # Earlier checkpoints evaluated on the same test protocol for comparison (siamese_<tag>.pt).
     comparison_tags: tuple[str, ...] = ("v2", "v2_no_hard", "v2_seed43", "v2_seed44")
     # Weights of predicted-query-theme vs catalogue-candidate-theme agreement; selected on validation.
@@ -193,7 +215,7 @@ class Settings:
     features: FeatureConfig = field(default_factory=FeatureConfig)
     evaluation: EvalConfig = field(default_factory=EvalConfig)
     database: DatabaseConfig = field(default_factory=DatabaseConfig)
-    model_version: str = "siamese-v2"
+    model_version: str = "siamese-v3"
 
 
 SETTINGS = Settings()

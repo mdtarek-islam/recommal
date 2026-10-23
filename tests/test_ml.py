@@ -96,7 +96,7 @@ def test_mine_pairs_without_hard_negatives_keeps_negative_count() -> None:
 
 
 def test_build_model_uses_config_dimensions() -> None:
-    cfg = replace(SETTINGS.siamese, hidden_dim=32, proj_dim=16)
+    cfg = replace(SETTINGS.siamese, hidden_dim=32, proj_dim=16, input_features="sbert")
     model = build_model(cfg)
     out = encode(model, torch.randn(3, SETTINGS.embedding.dim))
     assert out.shape == (3, 16)
@@ -195,7 +195,7 @@ def test_ensemble_encoder_averages_member_cosines() -> None:
 def test_build_model_with_theme_head_and_members() -> None:
     from src.ml.siamese import EnsembleEncoder
 
-    cfg = replace(SETTINGS.siamese, hidden_dim=32, proj_dim=16, theme_weight=1.0)
+    cfg = replace(SETTINGS.siamese, hidden_dim=32, proj_dim=16, theme_weight=1.0, input_features="sbert")
     model = build_model(cfg, members=2)
     assert isinstance(model.encoder, EnsembleEncoder)
     assert all(m.theme_head is not None for m in model.encoder.members)
@@ -262,3 +262,16 @@ def test_recommend_excludes_text_flagged_adult_targets() -> None:
     assert items["is_adult"].tolist() == [False, True, False]
     refined = recommend(vectors, items, prior, "control", top_n=1)
     assert refined.loc[refined["source_id"] == 1, "target_id"].tolist() == [3]
+
+
+def test_config_from_checkpoint_fills_v2_fields() -> None:
+    from dataclasses import asdict
+
+    from src.evaluation.evaluate import config_from_checkpoint
+
+    v2_fields = {"objective", "input_features", "tfidf_dim", "contrastive_weight", "infonce_weight", "theme_weight",
+                 "temperature", "graded_gamma", "steps_per_epoch", "ensemble_size"}  # fmt: skip
+    old = {k: v for k, v in asdict(SETTINGS.siamese).items() if k not in v2_fields}
+    cfg = config_from_checkpoint({"config": old})
+    assert (cfg.objective, cfg.input_features, cfg.theme_weight, cfg.ensemble_size) == ("pairs", "sbert", 0.0, 1)
+    assert config_from_checkpoint({"config": asdict(SETTINGS.siamese)}) == SETTINGS.siamese

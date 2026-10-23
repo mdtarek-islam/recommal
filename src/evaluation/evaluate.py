@@ -20,7 +20,7 @@ import numpy as np
 import pandas as pd
 import torch
 
-from src.config import SEED, SETTINGS, SiameseConfig, get_device, set_seed
+from src.config import SEED, SETTINGS, V2_FIELD_DEFAULTS, SiameseConfig, get_device, set_seed
 from src.embeddings.features import model_inputs
 from src.embeddings.sbert import load_embeddings
 from src.evaluation.leakage import masked_embeddings, masked_inputs, masked_rows
@@ -132,10 +132,15 @@ def tfidf_svd_vectors(items: pd.DataFrame, splits: np.ndarray, dim: int = 128) -
     return normalize(svd.transform(vectoriser.transform(texts))).astype(np.float32)
 
 
+def config_from_checkpoint(checkpoint: dict[str, Any]) -> SiameseConfig:
+    """Rebuild the training config. Fill fields that siamese-v2 checkpoints lack with v2 values."""
+    return SiameseConfig(**{**V2_FIELD_DEFAULTS, **checkpoint["config"]})
+
+
 def load_model(path: Path | None = None) -> SiameseNetwork:
     """Load a checkpoint and rebuild the network with the dimensions it was trained with."""
     checkpoint = torch.load(path or SETTINGS.paths.model_weights, map_location=get_device(), weights_only=True)
-    model = build_model(SiameseConfig(**checkpoint["config"]), members=checkpoint.get("members", 1))
+    model = build_model(config_from_checkpoint(checkpoint), members=checkpoint.get("members", 1))
     model.load_state_dict(checkpoint["state_dict"])
     return model.to(get_device())
 
@@ -184,7 +189,7 @@ def summarise(runs: list[Result]) -> dict[str, object]:
 def checkpoint_config(path: Path | None = None) -> tuple[SiameseConfig, dict[str, Any]]:
     """Return the training config and the raw metadata of a checkpoint."""
     checkpoint = torch.load(path or SETTINGS.paths.model_weights, map_location="cpu", weights_only=True)
-    return SiameseConfig(**checkpoint["config"]), checkpoint
+    return config_from_checkpoint(checkpoint), checkpoint
 
 
 def member_encoders(model: SiameseNetwork) -> list[SiameseEncoder]:
