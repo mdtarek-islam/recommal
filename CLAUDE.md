@@ -14,7 +14,8 @@ Recommal is a cross-domain multimedia recommender. It maps anime and video games
   - Mean Average Precision (MAP) >= 0.82.
   - Contrastive loss <= 0.15.
   - 100,000+ cleaned REST API records.
-- The repository holds no training code yet. The app reads precomputed rows from `siamese_recommendations`.
+- Pipeline: `src.ingest.build_dataset` -> `src.embeddings.sbert` -> `src.ml.train` -> `src.evaluation.evaluate` -> `src.evaluation.recommend` -> `db.migrate_and_seed`.
+- Ground truth: theme Jaccard from `src/ingest/themes.py`; never label pairs with the model's own input embeddings.
 
 ## 2. Language and Writing Standards
 
@@ -25,8 +26,11 @@ Recommal is a cross-domain multimedia recommender. It maps anime and video games
 ## 3. Token Efficiency and Subagent Routing
 
 - Scout first with `repo-scout` (haiku) for any task that needs repository context.
-- Build second with `streamlit-ui-builder` or `ml-data-pipeline` (opus), each in its own folders.
-- Test last with `qa-auditor` (sonnet).
+- Build second with the opus builders, each in its own paths:
+  - `ml-research-architect`: `src/ml/`, `src/embeddings/`, `src/evaluation/`.
+  - `data-db-optimiser`: `src/ingest/`, `src/db/`, `db/`.
+  - `streamlit-ui-ux`: `app.py`, `src/ui/`, `src/ab_testing/`, `.streamlit/`.
+- Test last with `qa-cyber-ci-auditor` (sonnet); review with `academic-critic-docs` (sonnet).
 - Use `/orchestrate` for a change that touches both the UI and the data layer.
 - Read only the line ranges you need; use Grep and Glob before Read.
 - Query context7 before you use an API that you have not checked in this session.
@@ -35,7 +39,7 @@ Recommal is a cross-domain multimedia recommender. It maps anime and video games
 
 ## 4. Domain and ML Style Rules
 
-- Set the Python, NumPy and PyTorch random seeds from the config module before training or evaluation.
+- Set the Python, NumPy and PyTorch random seeds to 42 through `set_seed()` in `src/config.py` before training or evaluation.
 - Create one `torch.device` object and move models and tensors with `.to(device)`; never call `.cuda()` directly.
 - Read batch size, embedding size and margin from the config module; never write them inline.
 - Assert embedding tensor shapes before each similarity or loss computation.
@@ -47,13 +51,14 @@ Recommal is a cross-domain multimedia recommender. It maps anime and video games
 - Log the A/B cohort, a hashed user id, the query and the recommendation ids for each results view.
 - Use parameterised SQL with `%s` placeholders only.
 - Show a fixed error message in the UI and log the exception; never pass raw exception text to `st.error`.
-- Return the database connection to a pool or close it in a `finally` block.
-- Replace the 10-table `steam_games_chunk_*` UNION with one view or table before you add game queries.
-- TODO: add project-specific overrides here after review.
+- Create one psycopg2 `ThreadedConnectionPool` per process in `src/db/pool.py`; hold it in Streamlit with `@st.cache_resource`.
+- Use `RealDictCursor` and read columns by name; never index a row by position.
+- Query the unified `steam_games` table; never shard catalogue tables to fit the free tier.
+- Use only free-tier services, open-weight checkpoints and OSS tools; keep the database under 500 MB.
 
 ## 5. Data and Architecture Rules
 
-- Keep one source-of-truth config and schema module at `recommal/config.py`; create it when the first setting moves out of code.
+- Keep every path, hyperparameter and A/B variant in the single config module `src/config.py`.
 - Read credentials, API URLs and Supabase keys from environment variables or `st.secrets` only.
 - Never hardcode personal strings, emails, API URLs, Supabase keys or `.streamlit/secrets.toml` values in source code.
 - Keep model weights (`*.pt`, `*.pth`, `*.bin`, `*.safetensors`, `*.onnx`) and datasets out of git; record their storage location in the config module.

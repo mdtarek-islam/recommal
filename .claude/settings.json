@@ -23,18 +23,6 @@
     "type": "command",
     "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/statusline.sh\""
   },
-  "extraKnownMarketplaces": {
-    "supabase-agent-skills": {
-      "source": {
-        "source": "github",
-        "repo": "supabase/agent-skills"
-      }
-    }
-  },
-  "enabledPlugins": {
-    "postgres-best-practices@supabase-agent-skills": true,
-    "supabase@claude-plugins-official": true
-  },
   "hooks": {
     "UserPromptSubmit": [
       {

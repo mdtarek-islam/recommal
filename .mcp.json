@@ -2,15 +2,15 @@
   "mcpServers": {
     "context7": {
       "command": "cmd",
-      "args": ["/c", "npx", "-y", "@upstash/context7-mcp@latest"]
+      "args": ["/c", "npx", "-y", "@upstash/context7-mcp@4.4.4"]
     },
     "playwright": {
       "command": "cmd",
-      "args": ["/c", "npx", "-y", "@playwright/mcp@latest", "--headless"]
+      "args": ["/c", "npx", "-y", "@playwright/mcp@0.0.83", "--headless"]
     },
     "supabase": {
       "type": "http",
-      "url": "https://mcp.supabase.com/mcp?read_only=true"
+      "url": "https://mcp.supabase.com/mcp?read_only=true&project_ref=dbgvsgajrqpxdewbstpx"
     }
   }
 }

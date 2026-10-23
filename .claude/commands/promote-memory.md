@@ -2,7 +2,7 @@
 description: Propose durable agent memory lessons for the committed knowledge files.
 ---
 
-1. For each agent in `repo-scout`, `streamlit-ui-builder`, `ml-data-pipeline` and `qa-auditor`:
+1. For each agent file in `.claude/agents/`:
    - Read `.claude/agent-memory/<agent>/MEMORY.md` and the files that it links. Skip agents with no memory.
    - Read `.claude/knowledge/<agent>.md`.
 2. Select only lessons that are durable and not obvious from the code, git history or `CLAUDE.md`.

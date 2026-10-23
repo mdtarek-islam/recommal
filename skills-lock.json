@@ -7,6 +7,12 @@
       "path": ".claude/skills/caveman",
       "computedHash": "3e9ec4f621a29eb1893dca1eb34f094ed57169b8141da7313f6b8f87e87d83f3"
     },
+    "ml-reproducibility": {
+      "source": "local",
+      "ref": "HEAD",
+      "path": ".claude/skills/ml-reproducibility",
+      "computedHash": "45b48c71c0fbd3d990cc1caec16c4cf77f4c924215f6f88a78bb4f0e75639351"
+    },
     "senior-commit": {
       "source": "local",
       "ref": "HEAD",
@@ -18,6 +24,12 @@
       "ref": "HEAD",
       "path": ".claude/skills/stop-slop",
       "computedHash": "8f86639802386a8a7c74e6bc57a8fe9799a0d9200068b47bc5a312371dec8af9"
+    },
+    "streamlit-ui-polish": {
+      "source": "local",
+      "ref": "HEAD",
+      "path": ".claude/skills/streamlit-ui-polish",
+      "computedHash": "909c62c0e4920253f83c063cfb7dac6af2251638f67b0e2d2ab0aa36be2426b1"
     },
     "supabase": {
       "source": "https://github.com/supabase-community/supabase-plugin",

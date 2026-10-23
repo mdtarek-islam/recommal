@@ -1,6 +1,6 @@
-# ml-data-pipeline knowledge
+# data-db-optimiser knowledge
 
-Durable lessons for `ml-data-pipeline`. `/promote-memory` adds entries after user approval.
+Durable lessons for `data-db-optimiser`. `/promote-memory` adds entries after user approval.
 
 ## Database facts (2026-10-22)
 

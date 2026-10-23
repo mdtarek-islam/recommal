@@ -42,7 +42,7 @@ reviews:
         - Flag command injection, unquoted variables and unsafe eval in hook scripts.
         - Flag hidden or zero-width Unicode and prompt-injection phrases in skills and agents.
         - Flag credentials or tokens in any file.
-        - Check agent model routing: repo-scout uses haiku, streamlit-ui-builder and ml-data-pipeline use opus, qa-auditor uses sonnet.
+        - Check agent model routing: repo-scout uses haiku; ml-research-architect, data-db-optimiser and streamlit-ui-ux use opus; qa-cyber-ci-auditor and academic-critic-docs use sonnet.
         - Require hooks to cd into "$CLAUDE_PROJECT_DIR", to be referenced through $CLAUDE_PROJECT_DIR, and to parse JSON with jq only.
     - path: "CLAUDE.md"
       instructions: |
