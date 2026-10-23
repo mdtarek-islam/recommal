@@ -231,3 +231,8 @@ qa-screenshots/
 .claude/agent-memory/
 .claude/ipc/
 .claude/settings.local.json
+
+# --- Recommal: generated data, model artefacts and local-only docs ---
+data/
+artefacts/
+LOCAL_RUNBOOK.md

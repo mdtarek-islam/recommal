@@ -1,0 +1,22 @@
+# Render Blueprint. Create it from the Render dashboard: New > Blueprint > this repository.
+# Set each variable marked sync: false in the dashboard. Never commit the values.
+services:
+  - type: web
+    name: recommal
+    runtime: docker
+    plan: free
+    healthCheckPath: /_stcore/health
+    autoDeploy: true
+    envVars:
+      - key: DB_HOST
+        sync: false
+      - key: DB_PORT
+        sync: false
+      - key: DB_NAME
+        sync: false
+      - key: DB_USER
+        sync: false
+      - key: DB_PASSWORD
+        sync: false
+      - key: RECOMMAL_AB_SALT
+        sync: false
