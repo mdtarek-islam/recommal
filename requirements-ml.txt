@@ -1,0 +1,6 @@
+# Training and evaluation. CPU torch wheels come from https://download.pytorch.org/whl/cpu
+-r requirements.txt
+torch==2.14.1
+sentence-transformers==6.2.0
+scikit-learn==1.9.1
+tqdm==4.70.1

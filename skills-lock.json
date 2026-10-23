@@ -1,0 +1,47 @@
+{
+  "version": 1,
+  "skills": {
+    "caveman": {
+      "source": "local",
+      "ref": "HEAD",
+      "path": ".claude/skills/caveman",
+      "computedHash": "3e9ec4f621a29eb1893dca1eb34f094ed57169b8141da7313f6b8f87e87d83f3"
+    },
+    "ml-reproducibility": {
+      "source": "local",
+      "ref": "HEAD",
+      "path": ".claude/skills/ml-reproducibility",
+      "computedHash": "45b48c71c0fbd3d990cc1caec16c4cf77f4c924215f6f88a78bb4f0e75639351"
+    },
+    "senior-commit": {
+      "source": "local",
+      "ref": "HEAD",
+      "path": ".claude/skills/senior-commit",
+      "computedHash": "afdeff2c59aeebc5ae810c4f893fec5b9a174e85826c06c6f2db198985335ff0"
+    },
+    "stop-slop": {
+      "source": "local",
+      "ref": "HEAD",
+      "path": ".claude/skills/stop-slop",
+      "computedHash": "8f86639802386a8a7c74e6bc57a8fe9799a0d9200068b47bc5a312371dec8af9"
+    },
+    "streamlit-ui-polish": {
+      "source": "local",
+      "ref": "HEAD",
+      "path": ".claude/skills/streamlit-ui-polish",
+      "computedHash": "909c62c0e4920253f83c063cfb7dac6af2251638f67b0e2d2ab0aa36be2426b1"
+    },
+    "supabase": {
+      "source": "https://github.com/supabase-community/supabase-plugin",
+      "ref": "016bf5b36670f7ad189ca90223513bd10406392d",
+      "path": "skills/supabase",
+      "computedHash": "44f4cfefb57751abf9288fb2920de621c748964de1301db627dea725e187bccf"
+    },
+    "supabase-postgres-best-practices": {
+      "source": "https://github.com/supabase/agent-skills",
+      "ref": "c9be0e931b7930f7d02126d04774d904c381e7d7",
+      "path": "skills/supabase-postgres-best-practices",
+      "computedHash": "4d7d1bd60f2ad7fd0d510269279519059dcc630d832f4c241d90735244c70525"
+    }
+  }
+}

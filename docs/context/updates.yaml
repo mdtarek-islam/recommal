@@ -1,0 +1,7 @@
+# Pending configuration updates for /sync-content.
+# Add one entry for each change. Use dotted keys: model.* and schema.* trigger ml-data-pipeline.
+# Example:
+#   - key: model.margin
+#     value: 1.0
+#     reason: Reduce contrastive loss below 0.15.
+changes: []

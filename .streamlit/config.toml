@@ -1,0 +1,38 @@
+# Streamlit configuration for Recommal. Keep secrets in .streamlit/secrets.toml, not here.
+
+[server]
+enableCORS = true
+enableXsrfProtection = true
+
+[client]
+showErrorDetails = false
+toolbarMode = "minimal"
+
+[browser]
+gatherUsageStats = false
+
+# One accent colour. Contrast (WCAG 2.1):
+# light accent #1F5FBF: 6.1:1 on #FFFFFF and with white button text.
+# dark accent #7EA6F2: 7.8:1 on #0E1117 and with #0E1117 button text (set in src/ui/components.py).
+# Body text: 16.7:1 (light) and 15.2:1 (dark). Secondary text #4A5160 / #A9B0BC: at least 7.3:1.
+[theme]
+font = "Segoe UI, Roboto, Helvetica Neue, Arial, sans-serif"
+baseRadius = "small"
+buttonRadius = "small"
+showWidgetBorder = true
+
+[theme.light]
+primaryColor = "#1F5FBF"
+backgroundColor = "#FFFFFF"
+secondaryBackgroundColor = "#F3F4F6"
+textColor = "#1B1E23"
+linkColor = "#1F5FBF"
+borderColor = "#C9CED6"
+
+[theme.dark]
+primaryColor = "#7EA6F2"
+backgroundColor = "#0E1117"
+secondaryBackgroundColor = "#1A1D24"
+textColor = "#E6E8EB"
+linkColor = "#7EA6F2"
+borderColor = "#3A404B"

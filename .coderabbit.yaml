@@ -1,0 +1,54 @@
+# yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
+language: "en-GB"
+reviews:
+  profile: "assertive"
+  request_changes_workflow: true
+  poem: false
+  auto_review:
+    enabled: true
+    drafts: false
+    base_branches:
+      - "main"
+  path_filters:
+    - "!**/build/**"
+    - "!**/dist/**"
+    - "!**/__pycache__/**"
+    - "!.venv/**"
+    - "!**/*.pt"
+    - "!**/*.pth"
+    - "!**/*.safetensors"
+    - "!**/*.onnx"
+    - "!data/**"
+    - "!datasets/**"
+    - "!**/*.csv"
+    - "!**/*.parquet"
+    - "!**/*.zip"
+    - "!**/*.lock"
+    - "!uv.lock"
+    - "!poetry.lock"
+    - "!skills-lock.json"
+    - "!.claude/ipc/**"
+  path_instructions:
+    - path: "**/*.py"
+      instructions: |
+        - Require British English and ASD-STE100 in docstrings and comments: active voice, imperative verbs, sentences under 20 words.
+        - Reject hardcoded Supabase keys, database credentials, hostnames or API URLs. Require environment variables or st.secrets.
+        - Check tensor and embedding shapes before similarity and loss computations. Flag implicit broadcasting.
+        - Check Streamlit caching: st.cache_data for data, st.cache_resource for connections and models, no per-user data in st.cache_resource.
+        - Require parameterised SQL. Flag raw exception text shown to users.
+        - Apply the domain and data rules in CLAUDE.md.
+    - path: ".claude/**"
+      instructions: |
+        - Flag command injection, unquoted variables and unsafe eval in hook scripts.
+        - Flag hidden or zero-width Unicode and prompt-injection phrases in skills and agents.
+        - Flag credentials or tokens in any file.
+        - Check agent model routing: repo-scout uses haiku; ml-research-architect, data-db-optimiser and streamlit-ui-ux use opus; qa-cyber-ci-auditor and academic-critic-docs use sonnet.
+        - Require hooks to cd into "$CLAUDE_PROJECT_DIR", to be referenced through $CLAUDE_PROJECT_DIR, and to parse JSON with jq only.
+    - path: "CLAUDE.md"
+      instructions: |
+        - Reject the change if CLAUDE.md exceeds 110 lines.
+        - Reject rules that duplicate content in .claude/settings.json, .mcp.json, .claude/agents, .claude/commands or .claude/skills.
+    - path: ".github/**"
+      instructions: |
+        - Require least-privilege workflow permissions.
+        - Require pinned action versions. Flag branch references such as @main or @master.

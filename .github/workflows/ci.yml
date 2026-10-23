@@ -1,0 +1,127 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  SECRET_RE: 'sk-ant-[A-Za-z0-9_-]{15,}|sk-(proj-)?[A-Za-z0-9]{20,}|sbp_[A-Za-z0-9]{20,}|gh[pousr]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}|AKIA[0-9A-Z]{16}|AIza[0-9A-Za-z_-]{35}|xox[baprs]-[0-9A-Za-z-]{10,}|-----BEGIN [A-Z ]+PRIVATE KEY-----'
+
+jobs:
+  checks:
+    name: Build and test
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Secret scan (gitleaks CLI)
+        run: |
+          mkdir -p "$RUNNER_TEMP/gitleaks"
+          curl -fsSL -o "$RUNNER_TEMP/gitleaks.tar.gz" https://github.com/gitleaks/gitleaks/releases/download/v8.18.4/gitleaks_8.18.4_linux_x64.tar.gz
+          # SHA256 from the official gitleaks_8.18.4_checksums.txt release asset.
+          echo "ba6dbb656933921c775ee5a2d1c13a91046e7952e9d919f9bac4cec61d628e7d  $RUNNER_TEMP/gitleaks.tar.gz" | sha256sum -c -
+          tar -xzf "$RUNNER_TEMP/gitleaks.tar.gz" -C "$RUNNER_TEMP/gitleaks" gitleaks
+          "$RUNNER_TEMP/gitleaks/gitleaks" detect --source . --redact --no-banner
+
+      - name: Secret scan (regex fallback)
+        run: |
+          if git ls-files -z | xargs -0 grep -nIE -e "$SECRET_RE" --; then
+            echo "FAIL: secret pattern found in tracked files"
+            exit 1
+          fi
+          echo "PASS: no secret pattern in tracked files"
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+          cache-dependency-path: requirements*.txt
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install torch --index-url https://download.pytorch.org/whl/cpu
+          pip install -r requirements-dev.txt
+
+      - name: Dependency audit (pip-audit)
+        run: pip-audit --skip-editable --progress-spinner off
+
+      - name: Static security scan (bandit)
+        # B608 is skipped: src/db/queries.py builds SQL from fixed allow-lists; tests/test_security.py checks them.
+        run: |
+          bandit -q -r src db auth_utils.py app.py -ll --skip B608
+          bandit -q -r src db auth_utils.py app.py -l --skip B608,B101,B311 || echo "WARN: low-severity bandit findings"
+
+      - name: Lint
+        run: ruff check .
+
+      - name: Typecheck
+        run: mypy
+
+      - name: Unit and ML tests
+        run: pytest -q --ignore=tests/e2e
+
+      - name: Compile check
+        run: python -m compileall -q app.py auth_utils.py src db
+
+      - name: Streamlit boot and Playwright smoke test
+        run: |
+          mkdir -p .claude/qa
+          streamlit run app.py --server.headless true --server.port 8501 > .claude/qa/streamlit.log 2>&1 &
+          for i in $(seq 1 30); do
+            if curl -fsS http://localhost:8501/_stcore/health > /dev/null; then
+              echo "PASS: Streamlit health endpoint responds"
+              break
+            fi
+            if [ "$i" -eq 30 ]; then
+              echo "FAIL: Streamlit did not start in 30 seconds"
+              exit 1
+            fi
+            sleep 1
+          done
+          if [ -d tests/e2e ]; then
+            python -m playwright install --with-deps chromium
+            pytest -q tests/e2e --output .claude/qa/playwright
+          else
+            echo "SKIP: no Playwright tests in tests/e2e"
+          fi
+
+      - name: Upload QA artefacts
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: qa-report
+          path: .claude/qa/
+          if-no-files-found: ignore
+
+  governance:
+    name: Governance guard
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      CLAUDE_PROJECT_DIR: ${{ github.workspace }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: CLAUDE.md line count and duplicate rules
+        run: bash "$CLAUDE_PROJECT_DIR/.claude/hooks/guard-claude-md.sh" --audit
+
+      - name: Skill safety scan
+        run: |
+          bash "$CLAUDE_PROJECT_DIR/.claude/hooks/scan-skill.sh" all
+          echo "PASS: skill scan clean"

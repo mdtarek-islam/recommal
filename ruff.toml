@@ -1,0 +1,13 @@
+target-version = "py313"
+line-length = 120
+extend-exclude = [".venv", "artefacts", "data"]
+
+[lint]
+select = ["E", "F", "W", "I", "B", "UP", "S", "BLE", "SIM", "RUF"]
+ignore = [
+    "S101",  # assert is the project's tensor-shape guard.
+    "S311",  # random is used for jitter and fixtures, not cryptography.
+]
+
+[lint.per-file-ignores]
+"tests/*" = ["S105", "S106"]
