@@ -1,267 +1,181 @@
-import psycopg2
-import os
-from dotenv import load_dotenv
+"""Authentication and results helpers for the Streamlit app.
+
+This module keeps the public API of the dissertation prototype. Database access lives in
+`src.db`; text cleaning lives in `src.ingest.clean`.
+"""
+
+from __future__ import annotations
+
+import logging
+import re
+import threading
+import time
+from typing import Any
+
 import bcrypt
-import streamlit as st
-from bs4 import BeautifulSoup
-import html
+import psycopg2
+from psycopg2 import errors as pg_errors
 
-# Load .env variables
-load_dotenv()
-user = os.getenv("user")
-password = os.getenv("password")
-host = os.getenv("host")
-port = os.getenv("port")
-dbname = os.getenv("dbname") # Add your dbname to .env as well
+from src.ab_testing.cohort import hash_user
+from src.db import queries
+from src.db.pool import DatabaseUnavailable
+from src.ingest.clean import clean_synopsis
 
-# --- Database Connection ---
+__all__ = [
+    "check_password",
+    "clean_synopsis",
+    "get_results_data",
+    "hash_password",
+    "login_user",
+    "register_user",
+    "validate_credentials",
+]
 
-def get_db_connection():
-    """Establishes a connection to the PostgreSQL database."""
+log = logging.getLogger(__name__)
+
+MIN_PASSWORD_LENGTH = 8
+MAX_PASSWORD_BYTES = 72  # bcrypt ignores or rejects input beyond 72 bytes.
+_EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+
+DB_ERROR = "The service is not available. Try again later."
+LOGIN_ERROR = "Incorrect email or password."
+THROTTLE_ERROR = "Too many attempts. Try again later."
+REGISTER_MESSAGE = "If this email can be registered, check your details and log in."
+
+MAX_FAILED_ATTEMPTS = 5
+THROTTLE_WINDOW_MINUTES = 15
+ATTEMPT_RETENTION_HOURS = 24
+_THROTTLE_RETRY_S = 600.0  # Time before a retry when public.login_attempts is missing.
+
+_throttle_lock = threading.Lock()
+_throttle_missing_since: float | None = None
+_throttle_warned = False
+
+
+def hash_password(password: str) -> str:
+    """Return a bcrypt hash with a random salt."""
+    return bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
+
+
+def check_password(hashed_password: str, user_password: str) -> bool:
+    """Return True when the password matches the stored hash."""
     try:
-        conn = psycopg2.connect(
-            dbname=dbname,
-            user=user,
-            password=password,
-            host=host,
-            port=port
-        )
-        return conn
-    except Exception as e:
-        st.error(f"Error connecting to database: {e}")
-        return None
-    
-def clean_synopsis(html_text):
-    """
-    Cleans HTML text from a synopsis string.
-    Removes tags (like images, divs) and unescapes HTML entities.
-    """
-    if not html_text:
-        return "No synopsis available."
-    
-    try:
-        # 1. Parse the HTML
-        soup = BeautifulSoup(html_text, "html.parser")
-        
-        # 2. Remove unwanted tags that don't contain text (like images, scripts, styles)
-        for tag in soup(["img", "div", "script", "style"]):
-            tag.decompose() # Remove the tag and all its contents
-        
-        # 3. Get the text, separating paragraphs with newlines
-        text = soup.get_text(separator="\n")
-        
-        # 4. Unescape HTML entities (e.g., &amp; -> &)
-        text = html.unescape(text)
-        
-        # 5. Clean up excessive whitespace and multiple newlines
-        lines = [line.strip() for line in text.splitlines()]
-        cleaned_lines = [line for line in lines if line] # Filter out empty lines
-        
-        return "\n".join(cleaned_lines)
-        
-    except Exception as e:
-        print(f"Error cleaning synopsis: {e}")
-        return html_text # Return original text if cleaning fails
+        return bcrypt.checkpw(user_password.encode("utf-8"), hashed_password.encode("utf-8"))
+    except ValueError:
+        return False
 
-# --- Password Hashing & Verification (This is the "strong encryption") ---
 
-def hash_password(password):
-    """Hashes a plaintext password using bcrypt."""
-    salt = bcrypt.gensalt()
-    hashed_pw = bcrypt.hashpw(password.encode('utf-8'), salt)
-    return hashed_pw.decode('utf-8') # Store as a string in the DB
+# Fixed hash for timing equalisation. The input is a public constant, not a secret.
+_DUMMY_HASH = hash_password("recommal-timing-dummy")
 
-def check_password(hashed_password, user_password):
-    """Checks if the provided password matches the stored hash."""
-    return bcrypt.checkpw(user_password.encode('utf-8'), hashed_password.encode('utf-8'))
 
-# --- User Management Functions ---
-
-def register_user(email, password):
-    """Registers a new user by hashing their password and saving to DB."""
+def validate_credentials(email: str, password: str) -> str | None:
+    """Return an error message, or None when the email and password are acceptable."""
     if not email or not password:
-        return False, "Email and password are required."
-        
-    hashed_pw = hash_password(password)
-    conn = get_db_connection()
-    if conn:
-        try:
-            with conn.cursor() as cur:
-                cur.execute(
-                    "INSERT INTO users (email, password_hash) VALUES (%s, %s)",
-                    (email, hashed_pw)
-                )
-                conn.commit()
-            return True, "Registration successful! Please log in."
-        except psycopg2.IntegrityError:
-            return False, "Email already exists."
-        except Exception as e:
-            return False, f"An error occurred: {e}"
-        finally:
-            conn.close()
-    return False, "Database connection failed."
+        return "Email and password are required."
+    if not _EMAIL_RE.match(email.strip()):
+        return "Enter a valid email address."
+    if len(password) < MIN_PASSWORD_LENGTH:
+        return f"Use a password with at least {MIN_PASSWORD_LENGTH} characters."
+    if len(password.encode("utf-8")) > MAX_PASSWORD_BYTES:
+        return f"Use a password of at most {MAX_PASSWORD_BYTES} bytes."
+    return None
 
-def login_user(email, password):
-    """Logs in a user by verifying their email and password hash."""
+
+def register_user(email: str, password: str) -> tuple[bool, str]:
+    """Create an account. Return one message for new and existing emails, so the result reveals no accounts."""
+    error = validate_credentials(email, password)
+    if error:
+        return False, error
+    try:
+        queries.insert_user(email.strip(), hash_password(password))
+    except psycopg2.IntegrityError:
+        log.info("register_user: duplicate email")
+    except (DatabaseUnavailable, psycopg2.Error) as exc:
+        # Log the type only: driver messages can contain host or user names.
+        log.error("register_user failed: %s", type(exc).__name__)
+        return False, DB_ERROR
+    return True, REGISTER_MESSAGE
+
+
+def _throttle_enabled() -> bool:
+    with _throttle_lock:
+        if _throttle_missing_since is None:
+            return True
+        return time.monotonic() - _throttle_missing_since >= _THROTTLE_RETRY_S
+
+
+def _mark_throttle_missing() -> None:
+    """Disable the server-side throttle for a while. Log a warning once per process."""
+    global _throttle_missing_since, _throttle_warned
+    with _throttle_lock:
+        _throttle_missing_since = time.monotonic()
+        warn, _throttle_warned = not _throttle_warned, True
+    if warn:
+        log.warning("Table public.login_attempts is missing. Apply migration 002. Login throttling is off.")
+
+
+def _mark_throttle_present() -> None:
+    global _throttle_missing_since
+    with _throttle_lock:
+        _throttle_missing_since = None
+
+
+def _is_throttled(email_hash: str) -> bool:
+    """Return True when the email hash has too many recent failures. Raise on database errors."""
+    if not _throttle_enabled():
+        return False
+    try:
+        failures = queries.count_recent_login_failures(email_hash, THROTTLE_WINDOW_MINUTES)
+    except pg_errors.UndefinedTable:
+        _mark_throttle_missing()
+        return False
+    _mark_throttle_present()
+    return failures >= MAX_FAILED_ATTEMPTS
+
+
+def _record_attempt(email_hash: str, succeeded: bool) -> None:
+    """Store the attempt. A failure here never blocks the login result."""
+    if not _throttle_enabled():
+        return
+    try:
+        queries.record_login_attempt(email_hash, succeeded, ATTEMPT_RETENTION_HOURS)
+    except pg_errors.UndefinedTable:
+        _mark_throttle_missing()
+    except (DatabaseUnavailable, psycopg2.Error) as exc:
+        # Log the type only: driver messages can contain host and user names.
+        log.warning("record_login_attempt failed (%s)", type(exc).__name__)
+
+
+def login_user(email: str, password: str) -> tuple[bool, str]:
     if not email or not password:
-        return False, "Please enter email and password."
-
-    conn = get_db_connection()
-    if conn:
-        try:
-            with conn.cursor() as cur:
-                cur.execute("SELECT email, password_hash FROM users WHERE email = %s", (email,))
-                user = cur.fetchone()
-                
-                if user:
-                    stored_email, stored_hash = user
-                    # Verify password
-                    if check_password(stored_hash, password):
-                        return True, "Login successful!"
-                    else:
-                        return False, "Incorrect email or password."
-                else:
-                    return False, "Incorrect email or password."
-        except Exception as e:
-            return False, f"An error occurred: {e}"
-        finally:
-            conn.close()
-            
-    return False, "Database connection failed."
-
-# (Keep all your existing auth functions: get_db_connection, hash_password, etc.)
-# --- Add the two new functions below ---
-
-def get_media_details(media_id, media_domain, cursor):
-    """
-    Fetches the synopsis and image URL for a given item from its domain table.
-    This function re-uses the provided database cursor for efficiency.
-    """
-    synopsis, image_url = "No synopsis available.", "default_image_url.png" # Fallbacks
-
+        return False, "Enter your email and password."
+    email_hash = hash_user(email)
     try:
-        if media_domain == 'anime':
-            # Get anime synopsis
-            cursor.execute("SELECT synopsis FROM animes WHERE id = %s", (media_id,))
-            synopsis_result = cursor.fetchone()
-            if synopsis_result:
-                raw_synopsis = synopsis_result[0]
-                synopsis = clean_synopsis(raw_synopsis) # Clean the text
-
-            # Get anime picture
-            cursor.execute("SELECT large_url FROM anime_main_pictures WHERE anime_id = %s", (media_id,))
-            image_result = cursor.fetchone()
-            if image_result:
-                image_url = image_result[0]
-            
-            return synopsis, image_url
-
-        elif media_domain == 'game':
-            # This large UNION query searches all 10 game tables at once.
-            union_query = """
-                SELECT detailed_description, header_image FROM (
-                    SELECT id, detailed_description, header_image FROM steam_games_chunk_1 WHERE id = %s
-                    UNION ALL
-                    SELECT id, detailed_description, header_image FROM steam_games_chunk_2 WHERE id = %s
-                    UNION ALL
-                    SELECT id, detailed_description, header_image FROM steam_games_chunk_3 WHERE id = %s
-                    UNION ALL
-                    SELECT id, detailed_description, header_image FROM steam_games_chunk_4 WHERE id = %s
-                    UNION ALL
-                    SELECT id, detailed_description, header_image FROM steam_games_chunk_5 WHERE id = %s
-                    UNION ALL
-                    SELECT id, detailed_description, header_image FROM steam_games_chunk_6 WHERE id = %s
-                    UNION ALL
-                    SELECT id, detailed_description, header_image FROM steam_games_chunk_7 WHERE id = %s
-                    UNION ALL
-                    SELECT id, detailed_description, header_image FROM steam_games_chunk_8 WHERE id = %s
-                    UNION ALL
-                    SELECT id, detailed_description, header_image FROM steam_games_chunk_9 WHERE id = %s
-                    UNION ALL
-                    SELECT id, detailed_description, header_image FROM steam_games_chunk_10 WHERE id = %s
-                ) AS all_games
-            """
-            # We must provide the media_id 10 times, one for each part of the UNION
-            params = (media_id,) * 10
-            cursor.execute(union_query, params)
-            game_details = cursor.fetchone()
-            
-            if game_details:
-                raw_synopsis = game_details[0]
-                synopsis = clean_synopsis(raw_synopsis) # Clean the text
-                image_url = game_details[1]
-                
-            return synopsis, image_url
-
-    except Exception as e:
-        st.error(f"Error in get_media_details: {e}")
-        return synopsis, image_url # Return fallbacks
-
-    return synopsis, image_url
+        # Check the throttle before bcrypt. The message is the same for known and unknown emails.
+        if _is_throttled(email_hash):
+            return False, THROTTLE_ERROR
+        row = queries.get_user_hash(email.strip())
+    except (DatabaseUnavailable, psycopg2.Error) as exc:
+        log.error("login_user failed: %s", type(exc).__name__)
+        return False, DB_ERROR
+    if row is None:
+        # Run bcrypt anyway so response time does not reveal unknown emails.
+        check_password(_DUMMY_HASH, password)
+        ok = False
+    else:
+        ok = check_password(row["password_hash"], password)
+    _record_attempt(email_hash, ok)
+    return (True, "Login successful.") if ok else (False, LOGIN_ERROR)
 
 
-def get_results_data(search_title, search_domain):
-    """
-    Fetches all data needed for the results page: input item details
-    and all 5 recommended item details.
-    """
-    conn = get_db_connection()
-    if not conn:
-        st.error("Database connection failed.")
+def get_results_data(domain: str, item_id: int, variant: str) -> dict[str, Any] | None:
+    """Return the input item and its ranked recommendations, or None when the item is missing."""
+    item = queries.get_item(domain, item_id)
+    if item is None:
         return None
-
-    try:
-        with conn.cursor() as cur:
-            # 1. Get the recommendations row
-            cur.execute(
-                "SELECT * FROM siamese_recommendations WHERE chosen_title ILIKE %s AND chosen_domain = %s LIMIT 1",
-                (f"%{search_title}%", search_domain)
-            )
-            siamese_row = cur.fetchone()
-
-            if not siamese_row:
-                st.warning("No recommendations found for that title.")
-                return None
-
-            # 2. Unpack Siamese data
-            chosen_id = siamese_row[1]
-            chosen_title = siamese_row[2] # Get the correctly cased title
-            rec_domain = siamese_row[3]
-
-            # 3. Get Input Item Details
-            input_synopsis, input_image = get_media_details(chosen_id, search_domain, cur)
-            input_data = {
-                "title": chosen_title,
-                "synopsis": input_synopsis if input_synopsis else "No synopsis found.",
-                "image_url": input_image
-            }
-
-            # 4. Get Recommended Items Details
-            rec_list = []
-            for i in range(5):
-                rec_id_index = 4 + (i * 3)
-                rec_title_index = 5 + (i * 3)
-                
-                rec_id = siamese_row[rec_id_index]
-                rec_title = siamese_row[rec_title_index]
-                
-                if rec_id and rec_title:
-                    rec_synopsis, rec_image = get_media_details(rec_id, rec_domain, cur)
-                    rec_list.append({
-                        "title": rec_title,
-                        "synopsis": rec_synopsis if rec_synopsis else "No synopsis found.",
-                        "image_url": rec_image
-                    })
-            
-            return {
-                "input_item": input_data,
-                "recommendations": rec_list,
-                "rec_domain": rec_domain
-            }
-
-    except Exception as e:
-        st.error(f"Error in get_results_data: {e}")
-        return None
-    finally:
-        conn.close()
-
+    return {
+        "input_item": item,
+        "recommendations": queries.get_recommendations(domain, item_id, variant),
+        "rec_domain": "game" if domain == "anime" else "anime",
+    }
