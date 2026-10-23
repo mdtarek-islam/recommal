@@ -53,7 +53,8 @@ jobs:
 
       - name: Install dependencies
         run: |
-          python -m pip install --upgrade pip
+          # setuptools ships with the runner image; pip-audit scans it, so upgrade past PYSEC-2025-49 and PYSEC-2026-3447.
+          python -m pip install --upgrade pip "setuptools>=83.0.0"
           pip install torch --index-url https://download.pytorch.org/whl/cpu
           pip install -r requirements-dev.txt
 
