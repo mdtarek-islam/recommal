@@ -1,0 +1,58 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 440" width="760" height="440" role="img" aria-labelledby="t d">
+<title id="t">Anime and games in one shared latent space</title>
+<desc id="d">Schematic. Anime points (blue circles) enter from the left and game points (amber squares) enter from the right. They settle into three theme clusters in one space. One anime query then links to its two nearest games. Positions are illustrative, not model output.</desc>
+<style>
+text{font-family:'Segoe UI',Helvetica,Arial,sans-serif;fill:#1f2328}
+.ttl{font-size:16px;font-weight:600}
+.sub{font-size:12px;fill:#57606a}
+.theme{font-size:12px;fill:#57606a;animation:late 10s ease-in-out infinite}
+.space{fill:none;stroke:#57606a;stroke-width:1.5;stroke-dasharray:6 5}
+.anime{fill:#1d4ed8}
+.game{fill:#b45309}
+.pt{animation:settle 10s infinite}
+.link{stroke:#15803d;stroke-width:2;stroke-dasharray:5 4;animation:late 10s ease-in-out infinite}
+.ring{fill:none;stroke:#15803d;stroke-width:2.5;animation:late 10s ease-in-out infinite}
+@keyframes settle{
+0%{transform:translate(var(--dx),var(--dy));opacity:0;animation-timing-function:cubic-bezier(.2,.7,.3,1)}
+8%{opacity:1}
+40%{transform:translate(0,0)}
+90%{transform:translate(0,0);opacity:1}
+100%{transform:translate(0,0);opacity:0}}
+@keyframes late{0%,42%{opacity:0}50%{opacity:1}90%{opacity:1}100%{opacity:0}}
+@media (prefers-reduced-motion:reduce){.pt,.link,.ring,.theme{animation:none}}
+</style>
+<rect width="760" height="440" rx="10" fill="#ffffff" stroke="#d0d7de"/>
+<text class="ttl" x="20" y="30">One latent space for both domains</text>
+<ellipse class="space" cx="385" cy="230" rx="250" ry="165"/>
+<text class="sub" x="385" y="88" text-anchor="middle">shared latent space</text>
+
+<text class="theme" x="290" y="214" text-anchor="middle">theme: fantasy</text>
+<text class="theme" x="480" y="202" text-anchor="middle">theme: horror</text>
+<text class="theme" x="392" y="364" text-anchor="middle">theme: sports</text>
+
+<g transform="translate(308,142)"><rect class="game pt" x="-6" y="-6" width="12" height="12" style="--dx:230px;--dy:-30px"/></g>
+<g transform="translate(276,182)"><rect class="game pt" x="-6" y="-6" width="12" height="12" style="--dx:230px;--dy:20px"/></g>
+<g transform="translate(500,128)"><rect class="game pt" x="-6" y="-6" width="12" height="12" style="--dx:230px;--dy:-10px"/></g>
+<g transform="translate(470,172)"><rect class="game pt" x="-6" y="-6" width="12" height="12" style="--dx:230px;--dy:40px"/></g>
+<g transform="translate(410,292)"><rect class="game pt" x="-6" y="-6" width="12" height="12" style="--dx:230px;--dy:-20px"/></g>
+<g transform="translate(378,332)"><rect class="game pt" x="-6" y="-6" width="12" height="12" style="--dx:230px;--dy:10px"/></g>
+
+<line class="link" x1="272" y1="148" x2="308" y2="142"/>
+<line class="link" x1="272" y1="148" x2="276" y2="182"/>
+<circle class="ring" cx="308" cy="142" r="13"/>
+<circle class="ring" cx="276" cy="182" r="13"/>
+<circle class="ring" cx="272" cy="148" r="15"/>
+
+<g transform="translate(272,148)"><circle class="anime pt" r="7" style="--dx:-230px;--dy:-20px"/></g>
+<g transform="translate(306,176)"><circle class="anime pt" r="7" style="--dx:-230px;--dy:30px"/></g>
+<g transform="translate(462,132)"><circle class="anime pt" r="7" style="--dx:-230px;--dy:10px"/></g>
+<g transform="translate(496,164)"><circle class="anime pt" r="7" style="--dx:-230px;--dy:-30px"/></g>
+<g transform="translate(372,296)"><circle class="anime pt" r="7" style="--dx:-230px;--dy:20px"/></g>
+<g transform="translate(406,326)"><circle class="anime pt" r="7" style="--dx:-230px;--dy:-10px"/></g>
+
+<text class="sub" x="228" y="124" text-anchor="end">anime query</text>
+<g transform="translate(20,412)"><circle class="anime" cx="6" cy="-4" r="6"/><text class="sub" x="18" y="0">anime</text>
+<rect class="game" x="80" y="-10" width="12" height="12"/><text class="sub" x="98" y="0">game</text>
+<line x1="150" y1="-4" x2="176" y2="-4" stroke="#15803d" stroke-width="2" stroke-dasharray="5 4"/><text class="sub" x="184" y="0">nearest games for the query</text></g>
+<text class="sub" x="740" y="416" text-anchor="end">Schematic only. Positions are not model output.</text>
+</svg>

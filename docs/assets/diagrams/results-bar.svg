@@ -1,0 +1,47 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 406" width="760" height="406" role="img" aria-labelledby="t d">
+<title id="t">MAP@10 by model and direction</title>
+<desc id="d">Grouped horizontal bars of test MAP@10. Random vectors: anime to game 0.0144, game to anime 0.0122; TF-IDF + SVD: anime to game 0.0483, game to anime 0.0458; Raw SBERT cosine: anime to game 0.0335, game to anime 0.0425; Siamese: anime to game 0.0602, game to anime 0.0842; Siamese + popularity prior: anime to game 0.0549, game to anime 0.0875.</desc>
+<style>text{font-family:'Segoe UI',Helvetica,Arial,sans-serif;fill:#1f2328}.sub{fill:#57606a;font-size:12px}.lab{font-size:13px}.val{font-size:12px}.ttl{font-size:16px;font-weight:600}.grid{stroke:#d0d7de;stroke-width:1}</style>
+<rect width="760" height="406" rx="10" fill="#ffffff" stroke="#d0d7de"/>
+<text class="ttl" x="20" y="28">Test MAP@10 by model and query direction</text>
+<rect x="20" y="42" width="12" height="12" fill="#1d4ed8"/><text class="sub" x="38" y="53">anime query, game candidates</text>
+<rect x="250" y="42" width="12" height="12" fill="#b45309"/><text class="sub" x="268" y="53">game query, anime candidates</text>
+<line class="grid" x1="200.0" y1="72" x2="200.0" y2="358"/>
+<text class="sub" x="200.0" y="374" text-anchor="middle">0.00</text>
+<line class="grid" x1="304.0" y1="72" x2="304.0" y2="358"/>
+<text class="sub" x="304.0" y="374" text-anchor="middle">0.02</text>
+<line class="grid" x1="408.0" y1="72" x2="408.0" y2="358"/>
+<text class="sub" x="408.0" y="374" text-anchor="middle">0.04</text>
+<line class="grid" x1="512.0" y1="72" x2="512.0" y2="358"/>
+<text class="sub" x="512.0" y="374" text-anchor="middle">0.06</text>
+<line class="grid" x1="616.0" y1="72" x2="616.0" y2="358"/>
+<text class="sub" x="616.0" y="374" text-anchor="middle">0.08</text>
+<line class="grid" x1="720.0" y1="72" x2="720.0" y2="358"/>
+<text class="sub" x="720.0" y="374" text-anchor="middle">0.10</text>
+<text class="lab" x="190" y="102" text-anchor="end">Random vectors</text>
+<rect x="200" y="84" width="74.8" height="15" fill="#1d4ed8"/>
+<text class="val" x="280.8" y="96">0.0144</text>
+<rect x="200" y="103" width="63.5" height="15" fill="#b45309"/>
+<text class="val" x="269.5" y="115">0.0122</text>
+<text class="lab" x="190" y="158" text-anchor="end">TF-IDF + SVD</text>
+<rect x="200" y="140" width="250.9" height="15" fill="#1d4ed8"/>
+<text class="val" x="456.9" y="152">0.0483</text>
+<rect x="200" y="159" width="238.3" height="15" fill="#b45309"/>
+<text class="val" x="444.3" y="171">0.0458</text>
+<text class="lab" x="190" y="214" text-anchor="end">Raw SBERT cosine</text>
+<rect x="200" y="196" width="174.4" height="15" fill="#1d4ed8"/>
+<text class="val" x="380.4" y="208">0.0335</text>
+<rect x="200" y="215" width="221.1" height="15" fill="#b45309"/>
+<text class="val" x="427.1" y="227">0.0425</text>
+<text class="lab" x="190" y="270" text-anchor="end" font-weight="600">Siamese</text>
+<rect x="200" y="252" width="313.0" height="15" fill="#1d4ed8"/>
+<text class="val" x="519.0" y="264">0.0602</text>
+<rect x="200" y="271" width="437.9" height="15" fill="#b45309"/>
+<text class="val" x="643.9" y="283">0.0842</text>
+<text class="lab" x="190" y="326" text-anchor="end">Siamese + popularity prior</text>
+<rect x="200" y="308" width="285.4" height="15" fill="#1d4ed8"/>
+<text class="val" x="491.4" y="320">0.0549</text>
+<rect x="200" y="327" width="455.2" height="15" fill="#b45309"/>
+<text class="val" x="661.2" y="339">0.0875</text>
+<text class="sub" x="200" y="398">MAP@10, higher is better. Axis ends at 0.10. Source: artefacts/metrics.json.</text>
+</svg>

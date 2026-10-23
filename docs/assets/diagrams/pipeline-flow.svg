@@ -1,0 +1,65 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 250" width="960" height="250" role="img" aria-labelledby="t d">
+<title id="t">Offline pipeline of Recommal</title>
+<desc id="d">Data packets move left to right through six stages: ingest, embed, train, evaluate, recommend and seed. Each stage lights up as a packet passes. The final stage loads Supabase PostgreSQL.</desc>
+<style>
+text{font-family:'Segoe UI',Helvetica,Arial,sans-serif;fill:#1f2328}
+.ttl{font-size:16px;font-weight:600}
+.name{font-size:15px;font-weight:600}
+.mod{font-size:10.5px;fill:#57606a;font-family:Consolas,Menlo,'Courier New',monospace}
+.out{font-size:11px;fill:#57606a}
+.box{fill:#f6f8fa;stroke:#57606a;stroke-width:1.5}
+.glow{fill:#1d4ed8;opacity:0;animation:pulse 3s ease-in-out infinite}
+.arrow{stroke:#57606a;stroke-width:1.5;fill:none}
+.head{fill:#57606a}
+.pkt{fill:#b45309;animation:fly 9s linear infinite}
+@keyframes fly{from{transform:translateX(0)}to{transform:translateX(910px)}}
+@keyframes pulse{0%{opacity:0}8%{opacity:.28}30%{opacity:0}100%{opacity:0}}
+@media (prefers-reduced-motion:reduce){.pkt{display:none}.glow{animation:none}}
+</style>
+<rect width="960" height="250" rx="10" fill="#ffffff" stroke="#d0d7de"/>
+<text class="ttl" x="20" y="30">Offline pipeline: data flows left to right</text>
+
+<g>
+<line class="arrow" x1="152" y1="125" x2="166" y2="125"/><path class="head" d="M166 120 L172 125 L166 130 Z"/>
+<line class="arrow" x1="308" y1="125" x2="322" y2="125"/><path class="head" d="M322 120 L328 125 L322 130 Z"/>
+<line class="arrow" x1="464" y1="125" x2="478" y2="125"/><path class="head" d="M478 120 L484 125 L478 130 Z"/>
+<line class="arrow" x1="620" y1="125" x2="634" y2="125"/><path class="head" d="M634 120 L640 125 L634 130 Z"/>
+<line class="arrow" x1="776" y1="125" x2="790" y2="125"/><path class="head" d="M790 120 L796 125 L790 130 Z"/>
+</g>
+
+<g>
+<rect class="box" x="16" y="90" width="136" height="70" rx="8"/><rect class="glow" x="16" y="90" width="136" height="70" rx="8" style="animation-delay:.63s"/>
+<text class="name" x="84" y="119" text-anchor="middle">Ingest</text><text class="mod" x="84" y="140" text-anchor="middle">ingest.build_dataset</text>
+
+<rect class="box" x="172" y="90" width="136" height="70" rx="8"/><rect class="glow" x="172" y="90" width="136" height="70" rx="8" style="animation-delay:2.17s"/>
+<text class="name" x="240" y="119" text-anchor="middle">Embed</text><text class="mod" x="240" y="140" text-anchor="middle">embeddings.sbert</text>
+
+<rect class="box" x="328" y="90" width="136" height="70" rx="8"/><rect class="glow" x="328" y="90" width="136" height="70" rx="8" style="animation-delay:.71s"/>
+<text class="name" x="396" y="119" text-anchor="middle">Train</text><text class="mod" x="396" y="140" text-anchor="middle">ml.train</text>
+
+<rect class="box" x="484" y="90" width="136" height="70" rx="8"/><rect class="glow" x="484" y="90" width="136" height="70" rx="8" style="animation-delay:2.25s"/>
+<text class="name" x="552" y="119" text-anchor="middle">Evaluate</text><text class="mod" x="552" y="140" text-anchor="middle">evaluation.evaluate</text>
+
+<rect class="box" x="640" y="90" width="136" height="70" rx="8"/><rect class="glow" x="640" y="90" width="136" height="70" rx="8" style="animation-delay:.8s"/>
+<text class="name" x="708" y="119" text-anchor="middle">Recommend</text><text class="mod" x="708" y="140" text-anchor="middle">evaluation.recommend</text>
+
+<rect class="box" x="796" y="90" width="136" height="70" rx="8"/><rect class="glow" x="796" y="90" width="136" height="70" rx="8" style="animation-delay:2.34s"/>
+<text class="name" x="864" y="119" text-anchor="middle">Seed</text><text class="mod" x="864" y="140" text-anchor="middle">db.migrate_and_seed</text>
+</g>
+
+<g>
+<text class="out" x="84" y="188" text-anchor="middle">items.parquet</text>
+<text class="out" x="240" y="188" text-anchor="middle">sbert_embeddings.npy</text>
+<text class="out" x="396" y="188" text-anchor="middle">siamese.pt</text>
+<text class="out" x="552" y="188" text-anchor="middle">metrics.json</text>
+<text class="out" x="708" y="188" text-anchor="middle">recommendations.parquet</text>
+<text class="out" x="864" y="188" text-anchor="middle">Supabase PostgreSQL</text>
+</g>
+<text class="out" x="20" y="232">Each label under a stage names the file or store that the stage writes.</text>
+
+<g>
+<circle class="pkt" cx="20" cy="125" r="6"/>
+<circle class="pkt" cx="20" cy="125" r="6" style="animation-delay:-3s"/>
+<circle class="pkt" cx="20" cy="125" r="6" style="animation-delay:-6s"/>
+</g>
+</svg>
