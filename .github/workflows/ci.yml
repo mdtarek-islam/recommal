@@ -23,7 +23,7 @@ jobs:
     timeout-minutes: 15
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
@@ -116,7 +116,7 @@ jobs:
       CLAUDE_PROJECT_DIR: ${{ github.workspace }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: CLAUDE.md line count and duplicate rules
         run: bash "$CLAUDE_PROJECT_DIR/.claude/hooks/guard-claude-md.sh" --audit
