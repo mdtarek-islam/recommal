@@ -239,3 +239,11 @@ LOCAL_RUNBOOK.md
 
 # --- Local planning notes (not committed) ---
 SCAFFOLD_BLUEPRINT.md
+# --- Local reproduction metrics ---
+docs/local/
+
+# Local secrets and measurements
+.env
+.env.*
+!.env.example
+docs/local/

@@ -35,6 +35,12 @@ class Paths:
         default_factory=lambda: _path_env("RECOMMAL_PROCESSED_DIR", PROJECT_ROOT / "data" / "processed")
     )
     artefact_dir: Path = field(default_factory=lambda: _path_env("RECOMMAL_ARTEFACT_DIR", PROJECT_ROOT / "artefacts"))
+    # Weight files (siamese*.pt). Set RECOMMAL_WEIGHTS_DIR to keep them outside the repo.
+    weights_dir: Path = field(
+        default_factory=lambda: _path_env(
+            "RECOMMAL_WEIGHTS_DIR", _path_env("RECOMMAL_ARTEFACT_DIR", PROJECT_ROOT / "artefacts")
+        )
+    )
 
     @property
     def anime_dump(self) -> Path:
@@ -54,7 +60,7 @@ class Paths:
 
     @property
     def model_weights(self) -> Path:
-        return self.artefact_dir / "siamese.pt"
+        return self.weights_dir / "siamese.pt"
 
     @property
     def metrics(self) -> Path:
@@ -79,7 +85,7 @@ class Paths:
 
     def checkpoint(self, tag: str = "") -> Path:
         """Return the main checkpoint path, or an ablation checkpoint path for `tag`."""
-        return self.artefact_dir / f"siamese_{tag}.pt" if tag else self.model_weights
+        return self.weights_dir / f"siamese_{tag}.pt" if tag else self.model_weights
 
 
 @dataclass(frozen=True)
