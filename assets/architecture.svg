@@ -1,0 +1,110 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 500" width="960" height="500" role="img" aria-labelledby="t d">
+  <title id="t">Recommal architecture</title>
+  <desc id="d">An offline pipeline turns MAL and Steam dumps into ingest, SBERT embeddings, a Siamese model, evaluation and recommendations, then seeds Supabase PostgreSQL. An online Streamlit app reads Supabase through a connection pool, with authentication and A/B testing modules.</desc>
+  <defs>
+    <marker id="ab" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <polygon points="0,0 10,5 0,10" fill="#58a6ff"/>
+    </marker>
+    <marker id="ag" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <polygon points="0,0 10,5 0,10" fill="#3fb950"/>
+    </marker>
+    <style>
+      text { font-family: -apple-system, "Segoe UI", Helvetica, Arial, sans-serif; fill: #e6edf3; }
+      .h { font-size: 16px; font-weight: 600; }
+      .lbl { font-size: 14px; fill: #8b949e; }
+      .n { font-size: 14px; font-weight: 600; text-anchor: middle; }
+      .s { font-size: 12px; fill: #8b949e; text-anchor: middle; }
+      .node { fill: #161b22; stroke: #30363d; stroke-width: 1; }
+      .focus { stroke: #58a6ff; }
+      .out { stroke: #3fb950; }
+      .flow { fill: none; stroke: #58a6ff; stroke-width: 1.5; stroke-dasharray: 8 6; animation: dash 1.6s linear infinite; }
+      .flow.g { stroke: #3fb950; }
+      .d1 { animation-delay: 0s; }
+      .d2 { animation-delay: 0.3s; }
+      .d3 { animation-delay: 0.6s; }
+      .d4 { animation-delay: 0.9s; }
+      .d5 { animation-delay: 1.2s; }
+      @keyframes dash { from { stroke-dashoffset: 28; } to { stroke-dashoffset: 0; } }
+      @media (prefers-reduced-motion: reduce) { .flow { animation: none; } }
+    </style>
+  </defs>
+  <rect width="960" height="500" fill="#0d1117"/>
+  <text x="30" y="34" class="h">Recommal: offline pipeline feeds an online Streamlit app</text>
+
+  <text x="30" y="68" class="lbl">Offline, developer machine</text>
+  <text x="184" y="230" class="lbl">Online, Streamlit server</text>
+
+  <!-- Row A: offline pipeline -->
+  <rect class="node" x="30" y="84" width="130" height="76" rx="6"/>
+  <text class="n" x="95" y="112">Raw dumps</text>
+  <text class="s" x="95" y="132">MAL and Steam</text>
+  <text class="s" x="95" y="148">SQL files</text>
+
+  <rect class="node" x="184" y="84" width="130" height="76" rx="6"/>
+  <text class="n" x="249" y="112">src/ingest</text>
+  <text class="s" x="249" y="132">build_dataset</text>
+  <text class="s" x="249" y="148">items.parquet</text>
+
+  <rect class="node" x="338" y="84" width="130" height="76" rx="6"/>
+  <text class="n" x="403" y="112">src/embeddings</text>
+  <text class="s" x="403" y="132">sbert.py</text>
+  <text class="s" x="403" y="148">sbert_embeddings.npy</text>
+
+  <rect class="node focus" x="492" y="84" width="130" height="76" rx="6"/>
+  <text class="n" x="557" y="112">src/ml</text>
+  <text class="s" x="557" y="132">Siamese encoder</text>
+  <text class="s" x="557" y="148">siamese.pt</text>
+
+  <rect class="node" x="646" y="84" width="130" height="76" rx="6"/>
+  <text class="n" x="711" y="112">src/evaluation</text>
+  <text class="s" x="711" y="132">metrics.json</text>
+  <text class="s" x="711" y="148">recommendations</text>
+
+  <rect class="node" x="800" y="84" width="130" height="76" rx="6"/>
+  <text class="n" x="865" y="112">db/</text>
+  <text class="s" x="865" y="132">migrate_and_seed</text>
+  <text class="s" x="865" y="148">SQL migrations</text>
+
+  <path class="flow d1" d="M160 122 H184" marker-end="url(#ab)"/>
+  <path class="flow d2" d="M314 122 H338" marker-end="url(#ab)"/>
+  <path class="flow d3" d="M468 122 H492" marker-end="url(#ab)"/>
+  <path class="flow d4" d="M622 122 H646" marker-end="url(#ab)"/>
+  <path class="flow d5" d="M776 122 H800" marker-end="url(#ab)"/>
+
+  <!-- Seed into Supabase -->
+  <path class="flow g d1" d="M865 160 V400" marker-end="url(#ag)"/>
+  <text x="853" y="360" class="lbl" text-anchor="end">precomputed rows</text>
+
+  <!-- Row B: online app -->
+  <rect class="node" x="184" y="250" width="130" height="64" rx="6"/>
+  <text class="n" x="249" y="278">Browser</text>
+  <text class="s" x="249" y="298">user session</text>
+
+  <rect class="node focus" x="338" y="250" width="130" height="64" rx="6"/>
+  <text class="n" x="403" y="278">app.py + src/ui</text>
+  <text class="s" x="403" y="298">Streamlit pages</text>
+
+  <rect class="node" x="492" y="250" width="130" height="64" rx="6"/>
+  <text class="n" x="557" y="278">auth_utils.py</text>
+  <text class="s" x="557" y="298">bcrypt, throttle</text>
+
+  <rect class="node" x="646" y="250" width="130" height="64" rx="6"/>
+  <text class="n" x="711" y="278">src/ab_testing</text>
+  <text class="s" x="711" y="298">cohort, events</text>
+
+  <path class="flow d2" d="M314 282 H338" marker-start="url(#ab)" marker-end="url(#ab)"/>
+
+  <!-- Row C: storage -->
+  <rect class="node" x="338" y="400" width="438" height="56" rx="6"/>
+  <text class="n" x="557" y="425">src/db/pool.py and queries.py</text>
+  <text class="s" x="557" y="443">ThreadedConnectionPool, parameterised SQL</text>
+
+  <rect class="node out" x="800" y="400" width="130" height="56" rx="6"/>
+  <text class="n" x="865" y="425">Supabase</text>
+  <text class="s" x="865" y="443">PostgreSQL, 6 tables</text>
+
+  <path class="flow d3" d="M403 314 V400" marker-end="url(#ab)"/>
+  <path class="flow d4" d="M557 314 V400" marker-end="url(#ab)"/>
+  <path class="flow d5" d="M711 314 V400" marker-end="url(#ab)"/>
+  <path class="flow g d2" d="M776 428 H800" marker-start="url(#ag)" marker-end="url(#ag)"/>
+</svg>

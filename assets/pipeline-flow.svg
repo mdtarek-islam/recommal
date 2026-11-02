@@ -1,0 +1,86 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 400" width="960" height="400" role="img" aria-labelledby="t d">
+  <title id="t">Recommal user session flow</title>
+  <desc id="d">A user logs in on the Streamlit login form. Login throttling runs first, then bcrypt checks the password in auth_utils.py. The user searches titles, the app assigns an A/B layout, queries Supabase under Row-Level Security, and shows ranked results.</desc>
+  <defs>
+    <marker id="ab" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <polygon points="0,0 10,5 0,10" fill="#58a6ff"/>
+    </marker>
+    <marker id="ag" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <polygon points="0,0 10,5 0,10" fill="#3fb950"/>
+    </marker>
+    <style>
+      text { font-family: -apple-system, "Segoe UI", Helvetica, Arial, sans-serif; fill: #e6edf3; }
+      .h { font-size: 16px; font-weight: 600; }
+      .lbl { font-size: 14px; fill: #8b949e; }
+      .n { font-size: 14px; font-weight: 600; text-anchor: middle; }
+      .s { font-size: 12px; fill: #8b949e; text-anchor: middle; }
+      .node { fill: #161b22; stroke: #30363d; stroke-width: 1; }
+      .focus { stroke: #58a6ff; }
+      .out { stroke: #3fb950; }
+      .flow { fill: none; stroke: #58a6ff; stroke-width: 1.5; stroke-dasharray: 8 6; animation: dash 1.6s linear infinite; }
+      .flow.g { stroke: #3fb950; }
+      .d1 { animation-delay: 0s; }
+      .d2 { animation-delay: 0.3s; }
+      .d3 { animation-delay: 0.6s; }
+      .d4 { animation-delay: 0.9s; }
+      .d5 { animation-delay: 1.2s; }
+      .d6 { animation-delay: 1.5s; }
+      .d7 { animation-delay: 1.8s; }
+      @keyframes dash { from { stroke-dashoffset: 28; } to { stroke-dashoffset: 0; } }
+      @media (prefers-reduced-motion: reduce) { .flow { animation: none; } }
+    </style>
+  </defs>
+  <rect width="960" height="400" fill="#0d1117"/>
+  <text x="30" y="34" class="h">Recommal: one user session, from login to ranked results</text>
+
+  <text x="30" y="68" class="lbl">1. Log in</text>
+  <text x="30" y="232" class="lbl">2. Search, assign a layout, read results</text>
+
+  <rect class="node" x="30" y="84" width="195" height="76" rx="6"/>
+  <text class="n" x="127" y="112">Login form</text>
+  <text class="s" x="127" y="132">app.py</text>
+  <text class="s" x="127" y="148">show_login_page</text>
+
+  <rect class="node" x="265" y="84" width="195" height="76" rx="6"/>
+  <text class="n" x="362" y="112">Throttle check</text>
+  <text class="s" x="362" y="132">src/ui/throttle.py</text>
+  <text class="s" x="362" y="148">5 failures, then a wait</text>
+
+  <rect class="node focus" x="500" y="84" width="195" height="76" rx="6"/>
+  <text class="n" x="597" y="112">bcrypt check</text>
+  <text class="s" x="597" y="132">auth_utils.py</text>
+  <text class="s" x="597" y="148">check_password</text>
+
+  <rect class="node" x="735" y="84" width="195" height="76" rx="6"/>
+  <text class="n" x="832" y="112">Search view</text>
+  <text class="s" x="832" y="132">app.py</text>
+  <text class="s" x="832" y="148">show_search_view</text>
+
+  <rect class="node" x="30" y="248" width="195" height="76" rx="6"/>
+  <text class="n" x="127" y="276">Title match</text>
+  <text class="s" x="127" y="296">src/ui/data.py</text>
+  <text class="s" x="127" y="312">search_titles</text>
+
+  <rect class="node" x="265" y="248" width="195" height="76" rx="6"/>
+  <text class="n" x="362" y="276">A/B assignment</text>
+  <text class="s" x="362" y="296">src/ab_testing/cohort.py</text>
+  <text class="s" x="362" y="312">control or explained</text>
+
+  <rect class="node focus" x="500" y="248" width="195" height="76" rx="6"/>
+  <text class="n" x="597" y="276">Supabase query</text>
+  <text class="s" x="597" y="296">src/db/pool.py</text>
+  <text class="s" x="597" y="312">Row-Level Security on</text>
+
+  <rect class="node out" x="735" y="248" width="195" height="76" rx="6"/>
+  <text class="n" x="832" y="276">Ranked results</text>
+  <text class="s" x="832" y="296">show_results_view</text>
+  <text class="s" x="832" y="312">feedback logged as events</text>
+
+  <path class="flow d1" d="M225 122 H265" marker-end="url(#ab)"/>
+  <path class="flow d2" d="M460 122 H500" marker-end="url(#ab)"/>
+  <path class="flow d3" d="M695 122 H735" marker-end="url(#ab)"/>
+  <path class="flow d4" d="M832 160 V204 H127 V248" marker-end="url(#ab)"/>
+  <path class="flow d5" d="M225 286 H265" marker-end="url(#ab)"/>
+  <path class="flow d6" d="M460 286 H500" marker-end="url(#ab)"/>
+  <path class="flow g d7" d="M695 286 H735" marker-end="url(#ag)"/>
+</svg>
