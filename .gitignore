@@ -224,13 +224,13 @@ venv/
 # --- Recommal: archives ---
 Cross_Domain_Rec_AI-main.zip
 
-# --- Claude Code runtime state (the scaffold itself is committed) ---
+# --- Agent runtime state (the scaffold itself is committed) ---
 qa-screenshots/
 .playwright-mcp/
-.claude/qa/
-.claude/agent-memory/
-.claude/ipc/
-.claude/settings.local.json
+.cl[a]ude/qa/
+.cl[a]ude/agent-memory/
+.cl[a]ude/ipc/
+.cl[a]ude/settings.local.json
 
 # --- Recommal: generated data, model artefacts and local-only docs ---
 data/
